@@ -6,6 +6,8 @@ __pycache__/
 #.idea/
 *.idea/
 
+*.png
+
 # C extensions
 *.so
 

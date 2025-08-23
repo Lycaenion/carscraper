@@ -1,5 +1,7 @@
 import pickle
 import time
+import sys
+import logging
 from dataclasses import dataclass
 from typing import Optional
 from selenium import webdriver
@@ -10,6 +12,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
 AUTOSCOUT24_URL = "https://www.autoscout24.com/lst?atype=C&cy=D%2CA%2CB%2CE%2CF%2CI%2CL%2CNL&damaged_listing=exclude&desc=1&powertype=kw&search_id=1wuxwwg2mq5&sort=age&source=homepage_search-mask&ustate=N%2CU"
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+console_out = logging.StreamHandler(sys.stdout)
+filehandler = logging.FileHandler('bla.log', encoding='utf-8')
+logger.addHandler(console_out)
+logger.addHandler(filehandler)
+
+
 
 @dataclass
 class CarData:
@@ -36,6 +47,7 @@ class Autoscout24Scraper:
         options = Options()
         options.add_argument("--headless")
         options.add_argument("--disable-gpu")
+        options.add_argument("window-size=1920,1080")
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
         self.handle_cookies()
@@ -63,9 +75,22 @@ class Autoscout24Scraper:
             self.base_window = self.driver.window_handles[0]
 
         except Exception as e:
-            print(f"Error handling cookies: {e}")
+            logger.info(f"Error handling cookies: {e}")
             self.driver.quit()
             raise
+
+    def handle_cookies(self):
+        if not self.load_cookies():
+            try:
+                if 'consent' in self.driver.current_url.lower():
+                    necessary_button = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.CLASS_NAME, 'scr-button scr-button--secondary'))
+                    )
+                    necessary_button.click()
+                    time.sleep(2)
+                    self.save_cookies()
+            except Exception as e:
+                logger.info(f"Error handling cookie consent: {e}")
 
 
     def load_cookies(self):
@@ -76,7 +101,7 @@ class Autoscout24Scraper:
                     self.driver.add_cookie(cookie)
             return True
         except FileNotFoundError:
-            print("Cookies file not found. Proceeding without loading cookies.")
+            logger.info("Cookies file not found. Proceeding without loading cookies.")
             return False
 
     def save_cookies(self):
@@ -84,17 +109,17 @@ class Autoscout24Scraper:
         with open(self.cookies_file, 'wb') as file:
             pickle.dump(cookies, file)
 
-    def handle_cookies(self):
-        if not self.load_cookies():
-            try:
-                cookie_button = WebDriverWait(self.driver, 5).until(
-                    EC.presence_of_element_located((By.ID, 'onetrust-accept-btn-handler'))
-                )
-                cookie_button.click()
-                time.sleep(2)
-                self.save_cookies()
-            except:
-                print("No cookie consent button found.")
+    # def handle_cookies(self):
+    #     if not self.load_cookies():
+    #         try:
+    #             cookie_button = WebDriverWait(self.driver, 5).until(
+    #                 EC.presence_of_element_located((By.ID, 'onetrust-accept-btn-handler'))
+    #             )
+    #             cookie_button.click()
+    #             time.sleep(2)
+    #             self.save_cookies()
+    #         except:
+    #             logger.info("No cookie consent button found.")
 
     def extract_car_data(self) -> Optional[CarData]:
         try:
@@ -106,7 +131,13 @@ class Autoscout24Scraper:
             if len(price_text) > 8:
                 price_text = price_text[:-1]
             price = int(price_text.strip('€').replace(' ', '').replace(',', ''))
-            year = self.driver.find_element(By.XPATH, '//*[@id="listing-history-section"]/div/div[2]/dl/dd[2]').text
+
+            try:
+                year = self.driver.find_element(By.XPATH, '//*[@id="listing-history-section"]/div/div[2]/dl/dd[2]').text
+            except NoSuchElementException as e:
+                logger.exception(self.driver.page_source.encode('utf-8'))
+                self.driver.save_screenshot('screen.png')
+                year = None
 
             try:
                 location_element = self.driver.find_element(By.XPATH, '//*[@id="vendor-and-cta-section"]/div/div[1]/div/div[2]/div[1]/div[2]/div[2]/a')
@@ -119,18 +150,30 @@ class Autoscout24Scraper:
                 location = None
 
             try:
-                fuel_element = self.driver.find_element(By.XPATH, '//*[@id="environment-details-section"]/div/div[2]/dl/dd[2]')
+                fuel = self.driver.find_element(By.XPATH, '//*[@id="environment-details-section"]/div/div[2]/dl/dd[2]').text
             except NoSuchElementException:
-                fuel_element = None
-
-            if fuel_element is not None:
-                fuel = fuel_element.text
-            else:
                 fuel = None
 
-            engine_power = self.driver.find_element(By.XPATH, '//*[@id="technical-details-section"]/div/div[2]/dl/dd[1]').text
-            gearbox = self.driver.find_element(By.XPATH, '//*[@id="technical-details-section"]/div/div[2]/dl/dd[2]').text
-            mileage = self.driver.find_element(By.XPATH, '//*[@id="listing-history-section"]/div/div[2]/dl/dd[1]/div').text
+            try:
+                engine_power = self.driver.find_element(By.XPATH, '//*[@id="technical-details-section"]/div/div[2]/dl/dd[1]').text
+            except NoSuchElementException as e:
+                logger.exception(self.driver.page_source.encode('utf-8'))
+                self.driver.save_screenshot('screen.png')
+                engine_power = None
+
+            try:
+                gearbox = self.driver.find_element(By.XPATH, '//*[@id="technical-details-section"]/div/div[2]/dl/dd[2]').text
+            except NoSuchElementException as e:
+                logger.exception(self.driver.page_source.encode('utf-8'))
+                self.driver.save_screenshot('screen.png')
+                gearbox = None
+
+            try:
+                mileage = self.driver.find_element(By.XPATH, '//*[@id="listing-history-section"]/div/div[2]/dl/dd[1]/div').text
+            except NoSuchElementException as e:
+                logger.exception(self.driver.page_source.encode('utf-8'))
+                self.driver.save_screenshot('screen.png')
+                mileage = None
 
             return CarData(
                 url=self.driver.current_url,
@@ -146,7 +189,7 @@ class Autoscout24Scraper:
                 mileage=mileage
             )
         except Exception as e:
-            print(f"Error extracting car data: {e}")
+            logger.info(f"Error extracting car data: {e}")
             return None
 
     def scrape(self):
@@ -192,14 +235,14 @@ class Autoscout24Scraper:
 
             # Check if we're on the correct site
             if 'autoscout24.com' not in self.driver.current_url:
-                print("Not an autoscout24 page, closing tab.")
+                logger.info("Not an autoscout24 page, closing tab.")
                 self.driver.close()
                 continue
 
             # Extract and process car data
             car_data = self.extract_car_data()
             if car_data:
-                print(car_data)
+                logger.info(car_data)
 
             # Close the current window
             self.driver.close()
@@ -212,4 +255,5 @@ def main():
     scraper.scrape()
 
 if __name__ == '__main__':
+    print(logger.handlers)
     main()
