@@ -27,7 +27,6 @@ class CarData:
     url: str
     brand: str
     model_ver: Optional[str]
-    model_name: Optional[str]
     price: int
     year: str
     location: Optional[str]
@@ -109,18 +108,6 @@ class Autoscout24Scraper:
         with open(self.cookies_file, 'wb') as file:
             pickle.dump(cookies, file)
 
-    # def handle_cookies(self):
-    #     if not self.load_cookies():
-    #         try:
-    #             cookie_button = WebDriverWait(self.driver, 5).until(
-    #                 EC.presence_of_element_located((By.ID, 'onetrust-accept-btn-handler'))
-    #             )
-    #             cookie_button.click()
-    #             time.sleep(2)
-    #             self.save_cookies()
-    #         except:
-    #             logger.info("No cookie consent button found.")
-
     def extract_car_data(self) -> Optional[CarData]:
         try:
             wait = WebDriverWait(self.driver, 10)
@@ -179,7 +166,6 @@ class Autoscout24Scraper:
                 url=self.driver.current_url,
                 brand=brand,
                 model_ver=model_ver,
-                model_name=None,
                 price=price,
                 year=year,
                 location=location,
