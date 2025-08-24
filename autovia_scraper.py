@@ -14,6 +14,8 @@ from selenium.webdriver.chrome.options import Options
 AUTOVIA_URL = "https://www.autovia.sk/osobne-auta/?p%5Border%5D=1"
 AUTOVIA_COOKIES_FILE = 'cookies/autovia.pkl'
 
+BATCH_SIZE = 5
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 console_out = logging.StreamHandler(sys.stdout)
@@ -36,9 +38,9 @@ class CarData:
     mileage: str
 
 class AutoviaScraper:
-    def __init__(self, url: str, cookies_file: str):
+    def __init__(self, url: str):
         self.url = url
-        self.cookies_file = cookies_file
+        self.cookies_file = AUTOVIA_COOKIES_FILE
         self.driver = None
         self.base_window = None
 
@@ -120,12 +122,17 @@ class AutoviaScraper:
             price_text = price_text.strip('€').replace(',', '').replace(' ', '')
             price = int(price_text)
             year_text = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Rok:')]/parent::div").text
-            year = year_text.strip().replace('Rok: ', '')
-            location = self.driver.find_element(By.XPATH, "//div[@title='Lokalita']").text
-            fuel = self.driver.find_element(By.XPATH, "//strong[contains(text(), 'Palivo:')]/parent::div").text
-            engine_power = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Výkon motora:')]/parent::div").text
-            gearbox = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Prevodovka:')]/parent::div").text
-            mileage = self.driver.find_element(By.XPATH, "//strong[contains(text(), 'Počet km:')]/parent::div").text
+            year = year_text.replace('Rok: ', '')
+            location_text = self.driver.find_element(By.XPATH, "//div[@title='Lokalita']").text
+            location = location_text.replace('Lokalita ', '')
+            fuel_text = self.driver.find_element(By.XPATH, "//strong[contains(text(), 'Palivo:')]/parent::div").text
+            fuel = fuel_text.replace('Palivo: ', '')
+            engine_power_text = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Výkon motora:')]/parent::div").text
+            engine_power = engine_power_text.replace('Výkon motora: ', '')
+            gearbox_text = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Prevodovka:')]/parent::div").text
+            gearbox = gearbox_text.replace('Prevodovka: ', '')
+            mileage_text = self.driver.find_element(By.XPATH, "//strong[contains(text(), 'Počet km:')]/parent::div").text
+            mileage = mileage_text.replace('Počet km: ', '')
 
             return CarData(
                 url=url,
@@ -148,7 +155,6 @@ class AutoviaScraper:
         time.sleep(20)
         self.base_window = self.driver.current_window_handle
         items = self.driver.find_elements(By.CSS_SELECTOR, 'section.resp-search-results div.resp-item')
-        print(len(items))
         links = []
         for item in items:
             try:
@@ -157,9 +163,8 @@ class AutoviaScraper:
             except NoSuchElementException as e:
                 logger.error(f"Error extracting link: {e}")
 
-        batch_size = 5
-        for i in range (0, len(links), batch_size):
-            batch = links[i:i + batch_size]
+        for i in range (0, len(links), BATCH_SIZE):
+            batch = links[i:i + BATCH_SIZE]
             self.process_batch(batch)
         self.driver.quit()
 
@@ -187,7 +192,7 @@ class AutoviaScraper:
             self.driver.close()
             self.driver.switch_to.window(self.base_window)
 def main():
-    scraper = AutoviaScraper(AUTOVIA_URL, AUTOVIA_COOKIES_FILE)
+    scraper = AutoviaScraper(AUTOVIA_URL)
     scraper.scrape()
 
 if __name__ == '__main__':
