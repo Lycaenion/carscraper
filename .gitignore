@@ -6,6 +6,11 @@ __pycache__/
 #.idea/
 *.idea/
 
+*.png
+
+#cookies
+/cookies
+
 # C extensions
 *.so
 
