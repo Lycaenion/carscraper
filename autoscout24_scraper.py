@@ -2,6 +2,7 @@ import pickle
 import time
 import sys
 import logging
+import project_db
 from dataclasses import dataclass
 from typing import Optional
 from selenium import webdriver
@@ -46,7 +47,7 @@ class Autoscout24Scraper:
         options = Options()
         options.add_argument("--headless")
         options.add_argument("--disable-gpu")
-        options.add_argument("window-size=1920,1080")
+        options.add_argument("window-size=1920,4080")
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
         self.handle_cookies()
@@ -110,7 +111,7 @@ class Autoscout24Scraper:
 
     def extract_car_data(self) -> Optional[CarData]:
         try:
-            wait = WebDriverWait(self.driver, 10)
+            wait = WebDriverWait(self.driver, 20)
             brand = wait.until(EC.presence_of_element_located(
                 (By.CLASS_NAME, 'StageTitle_makeModelContainer__RyjBP'))).text
             model_ver = self.driver.find_element(By.CLASS_NAME, 'StageTitle_modelVersion__Yof2Z').text
@@ -120,16 +121,18 @@ class Autoscout24Scraper:
             price = int(price_text.strip('€').replace(' ', '').replace(',', ''))
 
             try:
-                year = self.driver.find_element(By.XPATH, '//*[@id="listing-history-section"]/div/div[2]/dl/dd[2]').text
+                year = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[3]").text
             except NoSuchElementException as e:
                 logger.exception(self.driver.page_source.encode('utf-8'))
                 self.driver.save_screenshot('screen.png')
                 year = None
 
             try:
-                location_element = self.driver.find_element(By.XPATH, '//*[@id="vendor-and-cta-section"]/div/div[1]/div/div[2]/div[1]/div[2]/div[2]/a')
+                location_element = self.driver.find_element(By.XPATH,"//*[@id='vendor-and-cta-section']//*[starts-with(@class,'Department_departmentContainer')]/a")
             except NoSuchElementException:
                 location_element = None
+                logger.exception(self.driver.page_source.encode('utf-8'))
+                self.driver.save_screenshot('location_screen.png')
 
             if location_element is not None:
                 location = location_element.text
@@ -137,26 +140,26 @@ class Autoscout24Scraper:
                 location = None
 
             try:
-                fuel = self.driver.find_element(By.XPATH, '//*[@id="environment-details-section"]/div/div[2]/dl/dd[2]').text
+                fuel = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[4]").text
             except NoSuchElementException:
                 fuel = None
 
             try:
-                engine_power = self.driver.find_element(By.XPATH, '//*[@id="technical-details-section"]/div/div[2]/dl/dd[1]').text
+                engine_power = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[5]").text
             except NoSuchElementException as e:
                 logger.exception(self.driver.page_source.encode('utf-8'))
                 self.driver.save_screenshot('screen.png')
                 engine_power = None
 
             try:
-                gearbox = self.driver.find_element(By.XPATH, '//*[@id="technical-details-section"]/div/div[2]/dl/dd[2]').text
+                gearbox = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[2]").text
             except NoSuchElementException as e:
                 logger.exception(self.driver.page_source.encode('utf-8'))
                 self.driver.save_screenshot('screen.png')
                 gearbox = None
 
             try:
-                mileage = self.driver.find_element(By.XPATH, '//*[@id="listing-history-section"]/div/div[2]/dl/dd[1]/div').text
+                mileage = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[1]").text
             except NoSuchElementException as e:
                 logger.exception(self.driver.page_source.encode('utf-8'))
                 self.driver.save_screenshot('screen.png')
@@ -229,6 +232,19 @@ class Autoscout24Scraper:
             car_data = self.extract_car_data()
             if car_data:
                 logger.info(car_data)
+                project_db.add_to_db(
+                    url=car_data.url,
+                    webpage_name='autoscout24',
+                    brand=car_data.brand,
+                    model_version=car_data.model_ver,
+                    year=car_data.year,
+                    price=car_data.price,
+                    mileage=car_data.mileage,
+                    gearbox=car_data.gearbox,
+                    fuel_type=car_data.fuel,
+                    engine_power=car_data.engine_power,
+                    location=car_data.location
+                )
 
             # Close the current window
             self.driver.close()

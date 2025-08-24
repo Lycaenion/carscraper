@@ -11,6 +11,8 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
+import project_db
+
 AUTOVIA_URL = "https://www.autovia.sk/osobne-auta/?p%5Border%5D=1"
 AUTOVIA_COOKIES_FILE = 'cookies/autovia.pkl'
 
@@ -114,6 +116,14 @@ class AutoviaScraper:
     def extract_car_data(self) -> Optional[CarData]:
         try:
             url = self.driver.current_url
+
+            #check if advertisement exists in db
+            if project_db.if_advertisement_exists(url):
+                logger.info(f"Advertisement already exists in DB: {url}")
+                return None
+
+
+            #extract data
             brand = WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, '/html/body/main/div[2]/div[1]/div/h1'))
             ).text
@@ -189,6 +199,19 @@ class AutoviaScraper:
             car_data = self.extract_car_data()
             if car_data:
                 logger.info(car_data)
+                project_db.add_to_db(
+                    url=car_data.url,
+                    webpage_name='autovia',
+                    brand=car_data.brand,
+                    model_version=car_data.model_ver,
+                    year=car_data.year,
+                    price=car_data.price,
+                    mileage=car_data.mileage,
+                    gearbox=car_data.gearbox,
+                    fuel_type=car_data.fuel,
+                    engine_power=car_data.engine_power,
+                    location=car_data.location
+                )
             self.driver.close()
             self.driver.switch_to.window(self.base_window)
 def main():
