@@ -13,11 +13,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
 AUTOSCOUT24_URL = "https://www.autoscout24.com/lst?atype=C&cy=D%2CA%2CB%2CE%2CF%2CI%2CL%2CNL&damaged_listing=exclude&desc=1&powertype=kw&search_id=1wuxwwg2mq5&sort=age&source=homepage_search-mask&ustate=N%2CU"
-
+AUTOSCOUT24_COOKIES_FILE = 'cookies/autoscout24.pkl'
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 console_out = logging.StreamHandler(sys.stdout)
-filehandler = logging.FileHandler('bla.log', encoding='utf-8')
+filehandler = logging.FileHandler('autoscout24_scraper.log', encoding='utf-8')
 logger.addHandler(console_out)
 logger.addHandler(filehandler)
 
@@ -50,47 +50,24 @@ class Autoscout24Scraper:
         options.add_argument("window-size=1920,4080")
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
-        self.handle_cookies()
-
-        try:
-            selectors = [
-                (By.CLASS_NAME, 'sc-btn-primary'),
-                (By.CLASS_NAME, 'privacy-consent-accept'),
-                (By.CSS_SELECTOR, '[data-testid="consent-button"]'),
-                (By.XPATH, '//button[contains(text(), "Accept All")]'),
-            ]
-
-            for by, selector in selectors:
-                try:
-                    cookie_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((by, selector))
-                    )
-                    cookie_button.click()
-                    break
-                except:
-                    continue
-
-            self.load_cookies()
-            self.driver.refresh()
-            self.base_window = self.driver.window_handles[0]
-
-        except Exception as e:
-            logger.info(f"Error handling cookies: {e}")
-            self.driver.quit()
-            raise
+        if self.load_cookies() is not True:
+            self.handle_cookies()
+        self.driver.refresh()
+        self.base_window = self.driver.window_handles[0]
 
     def handle_cookies(self):
         if not self.load_cookies():
-            try:
-                if 'consent' in self.driver.current_url.lower():
-                    necessary_button = WebDriverWait(self.driver, 10).until(
-                        EC.element_to_be_clickable((By.CLASS_NAME, 'scr-button scr-button--secondary'))
-                    )
-                    necessary_button.click()
-                    time.sleep(2)
-                    self.save_cookies()
-            except Exception as e:
-                logger.info(f"Error handling cookie consent: {e}")
+            cookie_banner = WebDriverWait(self.driver, 2).until(
+                EC.presence_of_element_located((By.ID, 'as24-cmp-popup'))
+            )
+            privacy_button = self.driver.find_element(By.XPATH, "//button[contains(@class,'_consent-settings_1lphq_103')]")
+            privacy_button.click()
+
+            save_button = self.driver.find_element(By.XPATH, '//*[@id="root"]/div/article/section[1]/button[2]')
+            save_button.click()
+            self.save_cookies()
+        else:
+            self.load_cookies()
 
 
     def load_cookies(self):
@@ -111,7 +88,7 @@ class Autoscout24Scraper:
 
     def extract_car_data(self) -> Optional[CarData]:
         try:
-            wait = WebDriverWait(self.driver, 20)
+            wait = WebDriverWait(self.driver, 5)
             brand = wait.until(EC.presence_of_element_located(
                 (By.CLASS_NAME, 'StageTitle_makeModelContainer__RyjBP'))).text
             model_ver = self.driver.find_element(By.CLASS_NAME, 'StageTitle_modelVersion__Yof2Z').text
@@ -185,7 +162,7 @@ class Autoscout24Scraper:
         self.setup_driver()
         self.base_window = self.driver.current_window_handle
 
-        items = WebDriverWait(self.driver, 10).until(
+        items = WebDriverWait(self.driver, 5).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'article'))
         )
         links = []
@@ -218,7 +195,7 @@ class Autoscout24Scraper:
             self.driver.switch_to.window(window)
 
             # Wait for page to load completely
-            WebDriverWait(self.driver, 30).until(
+            WebDriverWait(self.driver, 5).until(
                 lambda x: x.execute_script("return document.readyState") == "complete"
             )
 
@@ -253,7 +230,7 @@ class Autoscout24Scraper:
         self.driver.switch_to.window(self.base_window)
 
 def main():
-    scraper = Autoscout24Scraper(AUTOSCOUT24_URL, 'autoscout24_cookies.pkl')
+    scraper = Autoscout24Scraper(AUTOSCOUT24_URL, AUTOSCOUT24_COOKIES_FILE)
     scraper.scrape()
 
 if __name__ == '__main__':
