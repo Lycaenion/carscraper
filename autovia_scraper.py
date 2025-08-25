@@ -13,7 +13,8 @@ from selenium.webdriver.chrome.options import Options
 
 import project_db
 
-AUTOVIA_URL = "https://www.autovia.sk/osobne-auta/?p%5Border%5D=1"
+#AUTOVIA_URL = "https://www.autovia.sk/osobne-auta/?p%5Border%5D=1"
+AUTOVIA_URL = "https://www.autovia.sk/osobne-auta/?p%5Border%5D=1&p%5Bpage%5D=4"
 AUTOVIA_COOKIES_FILE = 'cookies/autovia.pkl'
 
 BATCH_SIZE = 5
@@ -48,13 +49,14 @@ class AutoviaScraper:
 
     def setup_driver(self):
         options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
+        #options.add_argument("--headless")
+        #options.add_argument("--disable-gpu")
         options.add_argument("window-size=1920,1080")
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
         self.handle_cookies()
         self.driver.refresh()
+        self.base_window = self.driver.window_handles[0]
 
     def handle_cookies(self):
         if not self.load_cookies():
@@ -63,7 +65,7 @@ class AutoviaScraper:
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'iframe'))
                 )
                 self.driver.switch_to.frame('sp_message_iframe_1235490')
-                settings_btn = WebDriverWait(self.driver, 2).until(
+                settings_btn = WebDriverWait(self.driver, 10).until(
                      EC.element_to_be_clickable((By.XPATH, '//*[@id="notice"]/div[2]/button'))
                  )
                 settings_btn.click()
@@ -99,9 +101,8 @@ class AutoviaScraper:
                 logger.info(f"Advertisement already exists in DB: {url}")
                 return None
 
-
             #extract data
-            brand = WebDriverWait(self.driver, 2).until(
+            brand = WebDriverWait(self.driver, 20).until(
                 EC.presence_of_element_located((By.XPATH, '/html/body/main/div[2]/div[1]/div/h1'))
             ).text
             model_ver  = None
