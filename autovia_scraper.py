@@ -48,8 +48,8 @@ class AutoviaScraper:
 
     def setup_driver(self):
         options = Options()
-        #options.add_argument("--headless")
-        #options.add_argument("--disable-gpu")
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")
         options.add_argument("window-size=1920,1080")
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
@@ -176,19 +176,19 @@ class AutoviaScraper:
             car_data = self.extract_car_data()
             if car_data:
                 logger.info(car_data)
-                # project_db.add_to_db(
-                #     url=car_data.url,
-                #     webpage_name='autovia',
-                #     brand=car_data.brand,
-                #     model_version=car_data.model_ver,
-                #     year=car_data.year,
-                #     price=car_data.price,
-                #     mileage=car_data.mileage,
-                #     gearbox=car_data.gearbox,
-                #     fuel_type=car_data.fuel,
-                #     engine_power=car_data.engine_power,
-                #     location=car_data.location
-                # )
+                project_db.add_to_db(
+                    url=car_data.url,
+                    webpage_name='autovia',
+                    brand=car_data.brand,
+                    model_version=car_data.model_ver,
+                    year=car_data.year,
+                    price=car_data.price,
+                    mileage=car_data.mileage,
+                    gearbox=car_data.gearbox,
+                    fuel_type=car_data.fuel,
+                    engine_power=car_data.engine_power,
+                    location=car_data.location
+                )
             self.driver.close()
             self.driver.switch_to.window(self.base_window)
 def main():
