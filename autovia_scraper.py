@@ -40,9 +40,9 @@ class CarData:
     mileage: str
 
 class AutoviaScraper:
-    def __init__(self, url: str):
+    def __init__(self, url: str, cookies_file: str):
         self.url = url
-        self.cookies_file = AUTOVIA_COOKIES_FILE
+        self.cookies_file = cookies_file
         self.driver = None
         self.base_window = None
 
@@ -54,44 +54,21 @@ class AutoviaScraper:
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
         self.handle_cookies()
-
-        try:
-            selectors = [
-                (By.CLASS_NAME, 'sc-btn-primary'),
-                (By.CLASS_NAME, 'privacy-consent-accept'),
-                (By.CSS_SELECTOR, '[data-testid="consent-button"]'),
-                (By.XPATH, '//button[contains(text(), "Accept All")]'),
-            ]
-
-            for by, selector in selectors:
-                try:
-                    cookie_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((by, selector))
-                    )
-                    cookie_button.click()
-                    break
-                except:
-                    continue
-
-            self.load_cookies()
-            self.driver.refresh()
-            self.base_window = self.driver.window_handles[0]
-        except Exception as e:
-            logger.error(f"Error setting up driver: {e}")
-            self.driver.quit()
-            raise
+        self.driver.refresh()
+        self.base_window = self.driver.window_handles[0]
 
     def handle_cookies(self):
         if not self.load_cookies():
             try:
-                iframe = WebDriverWait(self.driver, 10).until(
+                iframe = WebDriverWait(self.driver, 2).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'iframe'))
                 )
                 self.driver.switch_to.frame('sp_message_iframe_1235490')
                 settings_btn = WebDriverWait(self.driver, 2).until(
-                     EC.element_to_be_clickable((By.XPATH, '//*[@id="notice"]/div[2]/button'))
-                 )
+                    EC.element_to_be_clickable((By.XPATH, '//*[@id="notice"]/div[2]/button'))
+                )
                 settings_btn.click()
+                #self.save_cookies()
                 self.driver.switch_to.default_content()
 
             except Exception as e:
@@ -124,7 +101,7 @@ class AutoviaScraper:
 
 
             #extract data
-            brand = WebDriverWait(self.driver, 10).until(
+            brand = WebDriverWait(self.driver, 20).until(
                 EC.presence_of_element_located((By.XPATH, '/html/body/main/div[2]/div[1]/div/h1'))
             ).text
             model_ver  = None
@@ -181,7 +158,7 @@ class AutoviaScraper:
     def process_batch(self, batch):
         for link in batch:
             self.driver.execute_script("window.open('{}');".format(link))
-            time.sleep(1)
+            time.sleep(5)
 
         window_handles = self.driver.window_handles[1:]
 
@@ -215,7 +192,7 @@ class AutoviaScraper:
             self.driver.close()
             self.driver.switch_to.window(self.base_window)
 def main():
-    scraper = AutoviaScraper(AUTOVIA_URL)
+    scraper = AutoviaScraper(AUTOVIA_URL, AUTOVIA_COOKIES_FILE)
     scraper.scrape()
 
 if __name__ == '__main__':
