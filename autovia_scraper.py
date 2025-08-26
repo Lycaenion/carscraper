@@ -68,8 +68,7 @@ class AutoviaScraper:
                     EC.element_to_be_clickable((By.XPATH, '//*[@id="notice"]/div[2]/button'))
                 )
                 settings_btn.click()
-                if self.load_cookies() is not True:
-                    self.save_cookies()
+                #self.save_cookies()
                 self.driver.switch_to.default_content()
 
             except Exception as e:
@@ -177,19 +176,19 @@ class AutoviaScraper:
             car_data = self.extract_car_data()
             if car_data:
                 logger.info(car_data)
-                project_db.add_to_db(
-                    url=car_data.url,
-                    webpage_name='autovia',
-                    brand=car_data.brand,
-                    model_version=car_data.model_ver,
-                    year=car_data.year,
-                    price=car_data.price,
-                    mileage=car_data.mileage,
-                    gearbox=car_data.gearbox,
-                    fuel_type=car_data.fuel,
-                    engine_power=car_data.engine_power,
-                    location=car_data.location
-                )
+                # project_db.add_to_db(
+                #     url=car_data.url,
+                #     webpage_name='autovia',
+                #     brand=car_data.brand,
+                #     model_version=car_data.model_ver,
+                #     year=car_data.year,
+                #     price=car_data.price,
+                #     mileage=car_data.mileage,
+                #     gearbox=car_data.gearbox,
+                #     fuel_type=car_data.fuel,
+                #     engine_power=car_data.engine_power,
+                #     location=car_data.location
+                # )
             self.driver.close()
             self.driver.switch_to.window(self.base_window)
 def main():
