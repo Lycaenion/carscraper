@@ -48,50 +48,28 @@ class AutoviaScraper:
 
     def setup_driver(self):
         options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
+        #options.add_argument("--headless")
+        #options.add_argument("--disable-gpu")
         options.add_argument("window-size=1920,1080")
         self.driver = webdriver.Chrome(options = options)
         self.driver.get(self.url)
         self.handle_cookies()
-
-        try:
-            selectors = [
-                (By.CLASS_NAME, 'sc-btn-primary'),
-                (By.CLASS_NAME, 'privacy-consent-accept'),
-                (By.CSS_SELECTOR, '[data-testid="consent-button"]'),
-                (By.XPATH, '//button[contains(text(), "Accept All")]'),
-            ]
-
-            for by, selector in selectors:
-                try:
-                    cookie_button = WebDriverWait(self.driver, 5).until(
-                        EC.element_to_be_clickable((by, selector))
-                    )
-                    cookie_button.click()
-                    break
-                except:
-                    continue
-
-            self.load_cookies()
-            self.driver.refresh()
-            self.base_window = self.driver.window_handles[0]
-        except Exception as e:
-            logger.error(f"Error setting up driver: {e}")
-            self.driver.quit()
-            raise
+        self.driver.refresh()
+        self.base_window = self.driver.window_handles[0]
 
     def handle_cookies(self):
         if not self.load_cookies():
             try:
-                iframe = WebDriverWait(self.driver, 10).until(
+                iframe = WebDriverWait(self.driver, 2).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, 'iframe'))
                 )
                 self.driver.switch_to.frame('sp_message_iframe_1235490')
                 settings_btn = WebDriverWait(self.driver, 2).until(
-                     EC.element_to_be_clickable((By.XPATH, '//*[@id="notice"]/div[2]/button'))
-                 )
+                    EC.element_to_be_clickable((By.XPATH, '//*[@id="notice"]/div[2]/button'))
+                )
                 settings_btn.click()
+                if self.load_cookies() is not True:
+                    self.save_cookies()
                 self.driver.switch_to.default_content()
 
             except Exception as e:
@@ -124,14 +102,14 @@ class AutoviaScraper:
 
 
             #extract data
-            brand = WebDriverWait(self.driver, 10).until(
+            brand = WebDriverWait(self.driver, 20).until(
                 EC.presence_of_element_located((By.XPATH, '/html/body/main/div[2]/div[1]/div/h1'))
             ).text
             model_ver  = None
             price_text = self.driver.find_element(By.CLASS_NAME, 'resp-price-main').text
             price_text = price_text.strip('€').replace(',', '').replace(' ', '')
             price = int(price_text)
-            year_text = self.driver.find_element(By.XPATH, "/html/body/main/div[2]/div[1]/div/div[6]/div/div[2]").text
+            year_text = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Rok:')]/parent::div").text
             year = year_text.replace('Rok: ', '')
             location_text = self.driver.find_element(By.XPATH, "//div[@title='Lokalita']").text
             location = location_text.replace('Lokalita ', '')
@@ -181,7 +159,7 @@ class AutoviaScraper:
     def process_batch(self, batch):
         for link in batch:
             self.driver.execute_script("window.open('{}');".format(link))
-            time.sleep(1)
+            time.sleep(5)
 
         window_handles = self.driver.window_handles[1:]
 
@@ -199,19 +177,19 @@ class AutoviaScraper:
             car_data = self.extract_car_data()
             if car_data:
                 logger.info(car_data)
-                # project_db.add_to_db(
-                #     url=car_data.url,
-                #     webpage_name='autovia',
-                #     brand=car_data.brand,
-                #     model_version=car_data.model_ver,
-                #     year=car_data.year,
-                #     price=car_data.price,
-                #     mileage=car_data.mileage,
-                #     gearbox=car_data.gearbox,
-                #     fuel_type=car_data.fuel,
-                #     engine_power=car_data.engine_power,
-                #     location=car_data.location
-                # )
+                project_db.add_to_db(
+                    url=car_data.url,
+                    webpage_name='autovia',
+                    brand=car_data.brand,
+                    model_version=car_data.model_ver,
+                    year=car_data.year,
+                    price=car_data.price,
+                    mileage=car_data.mileage,
+                    gearbox=car_data.gearbox,
+                    fuel_type=car_data.fuel,
+                    engine_power=car_data.engine_power,
+                    location=car_data.location
+                )
             self.driver.close()
             self.driver.switch_to.window(self.base_window)
 def main():
