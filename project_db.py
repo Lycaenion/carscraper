@@ -93,7 +93,7 @@ def add_to_db(url: str,
     except Exception as e:
         print(f"Error adding to database: {e}")
 
-def if_advertisement_exists(url: str) -> bool:
+def url_exists(url: str) -> bool:
     try:
         with Session() as session:
             exists = session.query(Advertisement).filter_by(url = url).first()
