@@ -95,7 +95,7 @@ class AutoviaScraper:
             url = self.driver.current_url
 
             #check if advertisement exists in db
-            if project_db.if_advertisement_exists(url):
+            if project_db.url_exists(url):
                 logger.info(f"Advertisement already exists in DB: {url}")
                 return None
 

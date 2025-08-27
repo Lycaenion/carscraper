@@ -12,7 +12,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
-AUTOSCOUT24_URL = "https://www.autoscout24.com/lst?atype=C&cy=D%2CA%2CB%2CE%2CF%2CI%2CL%2CNL&damaged_listing=exclude&desc=1&powertype=kw&search_id=1wuxwwg2mq5&sort=age&source=homepage_search-mask&ustate=N%2CU"
+AUTOSCOUT24_URL = "https://www.autoscout24.com/lst?atype=C&cy=D%2CA%2CI%2CB%2CNL%2CE%2CL%2CF&desc=0&page=3&search_id=dgi7uvtdr3&sort=standard&source=listpage_pagination&ustate=N%2CU"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -181,55 +181,83 @@ class Autoscout24Scraper:
             logger.info(f"Error extracting car data: {e}")
             return None
 
-    def scrape(self):
+    def scrape(self, max_pages = 20):
         self.setup_driver()
         self.base_window = self.driver.current_window_handle
+        current_page = 1
+        duplicate_entry_found = False
 
-        items = WebDriverWait(self.driver, 10).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'article'))
-        )
-        links = []
-        for item in items:
+        while current_page <= max_pages and not duplicate_entry_found:
+            logger.info(f"Processing page {current_page} of {max_pages}")
+            items = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'article'))
+            )
+            links = []
+            for item in items:
+                try:
+                    link = item.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
+                    links.append(link)
+                except NoSuchElementException:
+                    continue
+
+            batch_size = 5
+            for i in range(0, len(links), batch_size):
+                batch = links[i:i + batch_size]
+                if self.process_batch(batch):
+                    duplicate_entry_found = True
+                    logger.info(f"Duplicate entry found in database. Stopping further processing.")
+                    break
+
+            if duplicate_entry_found or current_page == max_pages:
+                logger.info("Stopping: duplicate entry found or max pages reached.")
+                break
+
             try:
-                link = item.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
-                links.append(link)
-            except NoSuchElementException:
-                continue
-
-        batch_size = 5
-        for i in range(0, len(links), batch_size):
-            batch = links[i:i + batch_size]
-            self.process_batch(batch)
+                next_page_btn = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[aria-label="Go to next page"]'))
+                )
+                if not next_page_btn.is_enabled():
+                    logger.info("No more pages to process. Exiting.")
+                    break
+                next_page_btn.click()
+                current_page += 1
+                time.sleep(5)
+                WebDriverWait(self.driver, 10).until(
+                    lambda x: x.execute_script("return document.readyState") == "complete"
+                )
+            except Exception as e:
+                logger.info(f"Error navigating to next page: {e}")
+                break
 
         self.driver.quit()
 
     def process_batch(self, batch):
         # Open new tabs for each link
         for link in batch:
+            if project_db.url_exists(link):
+                logger.info(f"URL already exists in database: {link}")
+                return True
+
             self.driver.execute_script("window.open('{}');".format(link))
-            time.sleep(0.5)
+            time.sleep(2)
 
-        # Get all windows except the main window
-        window_handles = self.driver.window_handles[1:]  # Skip the main/first window
 
-        # Process each window
+        window_handles = self.driver.window_handles[1:]
+
         for window in window_handles:
-            # Switch to the specific window
             self.driver.switch_to.window(window)
 
-            # Wait for page to load completely
             WebDriverWait(self.driver, 30).until(
                 lambda x: x.execute_script("return document.readyState") == "complete"
             )
 
-            # Check if we're on the correct site
             if 'autoscout24.com' not in self.driver.current_url:
                 logger.info("Not an autoscout24 page, closing tab.")
                 self.driver.close()
                 continue
 
-            # Extract and process car data
             car_data = self.extract_car_data()
+
             if car_data:
                 logger.info(car_data)
                 project_db.add_to_db(
@@ -246,11 +274,10 @@ class Autoscout24Scraper:
                     location=car_data.location
                 )
 
-            # Close the current window
             self.driver.close()
 
-        # Return to the main window
         self.driver.switch_to.window(self.base_window)
+        return False
 
 def main():
     scraper = Autoscout24Scraper(AUTOSCOUT24_URL, 'autoscout24_cookies.pkl')
