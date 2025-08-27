@@ -232,7 +232,6 @@ class Autoscout24Scraper:
         self.driver.quit()
 
     def process_batch(self, batch):
-        # Open new tabs for each link
         for link in batch:
             if project_db.url_exists(link):
                 logger.info(f"URL already exists in database: {link}")
@@ -241,12 +240,10 @@ class Autoscout24Scraper:
             self.driver.execute_script("window.open('{}');".format(link))
             time.sleep(2)
 
-
         window_handles = self.driver.window_handles[1:]
 
         for window in window_handles:
             self.driver.switch_to.window(window)
-
             WebDriverWait(self.driver, 30).until(
                 lambda x: x.execute_script("return document.readyState") == "complete"
             )

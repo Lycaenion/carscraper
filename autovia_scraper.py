@@ -137,28 +137,61 @@ class AutoviaScraper:
             logger.error(f"Error extracting car data: {e}")
             return None
 
-    def scrape(self):
+    def scrape(self, max_pages = 20):
         self.setup_driver()
-        time.sleep(20)
+        time.sleep(10)
         self.base_window = self.driver.current_window_handle
-        items = self.driver.find_elements(By.CSS_SELECTOR, 'section.resp-search-results div.resp-item')
-        links = []
-        for item in items:
-            try:
-                link = item.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
-                links.append(link)
-            except NoSuchElementException as e:
-                logger.error(f"Error extracting link: {e}")
+        current_page = 1
+        duplicate_entry_found = False
 
-        for i in range (0, len(links), BATCH_SIZE):
-            batch = links[i:i + BATCH_SIZE]
-            self.process_batch(batch)
+        while current_page <= max_pages and not duplicate_entry_found:
+            logger.info(f"Processing page {current_page} of {max_pages}")
+            items = self.driver.find_elements(By.CSS_SELECTOR, 'section.resp-search-results div.resp-item')
+            links = []
+            for item in items:
+                try:
+                    link = item.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
+                    links.append(link)
+                except NoSuchElementException as e:
+                    logger.error(f"Error extracting link: {e}")
+
+            for i in range (0, len(links), BATCH_SIZE):
+                batch = links[i:i + BATCH_SIZE]
+                if self.process_batch(batch):
+                    duplicate_entry_found = True
+                    logger.info(f"Duplicate entry found in database. Stopping further processing.")
+                    break
+
+            if duplicate_entry_found or current_page == max_pages:
+                logger.info("Stopping: duplicate entry found or max pages reached.")
+                break
+
+            try:
+                next_page_lnk = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, 'a.button.sm.resp-arrow-right'))
+                )
+                if not next_page_lnk:
+                    logger.info("No more pages to process.")
+                    break
+                next_page_lnk.click()
+                current_page += 1
+                time.sleep(5)
+                WebDriverWait(self.driver, 10).until(
+                    lambda x: x.execute_script("return document.readyState") == "complete"
+                )
+            except Exception as e:
+                logger.info(f"Error extracting next page: {e}")
+                break
         self.driver.quit()
 
     def process_batch(self, batch):
         for link in batch:
+            if project_db.url_exists(link):
+                logger.info(f"URL already exists in database: {link}")
+                return True
+
             self.driver.execute_script("window.open('{}');".format(link))
-            time.sleep(5)
+            time.sleep(2)
 
         window_handles = self.driver.window_handles[1:]
 
@@ -170,10 +203,11 @@ class AutoviaScraper:
 
             if 'autovia' not in self.driver.current_url:
                 logger.info("Not an autovia link, closing tab.")
-                self.driver.quit()
+                self.driver.close()
                 continue
 
             car_data = self.extract_car_data()
+
             if car_data:
                 logger.info(car_data)
                 project_db.add_to_db(
@@ -190,7 +224,9 @@ class AutoviaScraper:
                     location=car_data.location
                 )
             self.driver.close()
-            self.driver.switch_to.window(self.base_window)
+
+        self.driver.switch_to.window(self.base_window)
+        return False
 def main():
     scraper = AutoviaScraper(AUTOVIA_URL, AUTOVIA_COOKIES_FILE)
     scraper.scrape()
