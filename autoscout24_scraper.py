@@ -12,8 +12,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
-AUTOSCOUT24_URL = "https://www.autoscout24.com/lst?atype=C&cy=D%2CA%2CI%2CB%2CNL%2CE%2CL%2CF&desc=0&page=3&search_id=dgi7uvtdr3&sort=standard&source=listpage_pagination&ustate=N%2CU"
-
+AUTOSCOUT24_URL = "https://www.autoscout24.com/lst?atype=C&cy=D%2CA%2CB%2CE%2CF%2CI%2CL%2CNL&damaged_listing=exclude&desc=1&powertype=kw&search_id=18gsqq7erb&sort=age&source=homepage_search-mask&ustate=N%2CU"
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 console_out = logging.StreamHandler(sys.stdout)
