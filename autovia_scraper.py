@@ -227,9 +227,12 @@ class AutoviaScraper:
 
         self.driver.switch_to.window(self.base_window)
         return False
-def main():
+
+
+def main(event, context):
     scraper = AutoviaScraper(AUTOVIA_URL, AUTOVIA_COOKIES_FILE)
     scraper.scrape()
 
+
 if __name__ == '__main__':
-    main()
+    main({}, {})
