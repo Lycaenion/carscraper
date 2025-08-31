@@ -1,6 +1,10 @@
 terraform {
   required_version = ">= 1.0.0" # Ensure that the Terraform version is 1.0.0 or higher
 
+  backend "local" {
+    path = "./terraform.tfstate"
+  }
+
   required_providers {
     aws = {
       source = "hashicorp/aws" # Specify the source of the AWS provider
@@ -31,32 +35,6 @@ locals {
   }
 }
 
-resource "null_resource" "projectdb" {
-    triggers = {
-        lambda_code = local.projectdb_code
-    }
-    provisioner "local-exec" {
-        command = "echo \"${base64encode(local.projectdb_code)}\" | base64 -d" # Placeholder command for setting up the database
-    }
-}
-
-resource "null_resource" "autovia" {
-    triggers = {
-        lambda_code = local.autovia_code
-    }
-    provisioner "local-exec" {
-        command = "echo \"${base64encode(local.autovia_code)}\" | base64 -d" # Placeholder command for setting up the autovia scraper
-    }
-}
-
-resource "null_resource" "autoscout24" {
-    triggers = {
-        lambda_code = local.autoscout24_code
-    }
-    provisioner "local-exec" {
-        command = "echo \"${base64encode(local.autoscout24_code)}\" | base64 -d" # Placeholder command for setting up the autoscout24 scraper
-    }
-}
 
 data "archive_file" "lambda_zip" {
   output_path = "${path.module}/${local.lambda_function_name}.zip"
@@ -79,20 +57,21 @@ data "archive_file" "lambda_zip" {
 }
 
 resource "aws_lambda_function" "carscraper" {
-  function_name = locals.lambda_function_name
+  function_name = local.lambda_function_name
   role          = aws_iam_role.lambda_exec_role.arn
   handler       = "autovia_scraper.main"
-  runtime       = "python3.13"
-  layers        = []
+  runtime       = "python3.10"
+  layers        = [aws_lambda_layer_version.deps.arn]
   tags          = local.tags
   memory_size   = "2048"
   timeout       = 300
   filename      = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  depends_on    = [aws_iam_role_policy_attachment.lambda_basic_execution]
 }
 
 resource "aws_iam_role" "lambda_exec_role" {
-  name = "${locals.lambda_function_name}_exec_role"
+  name = "${local.lambda_function_name}_exec_role"
   tags = local.tags
 
   assume_role_policy = jsonencode({
@@ -115,7 +94,34 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
 }
 
 resource "aws_cloudwatch_log_group" "log_group" {
-  name             = "/aws/lambda/${locals.lambda_function_name}"
-  retention_in_days = 10
+  name             = "/aws/lambda/${local.lambda_function_name}"
+  retention_in_days = 14
   tags              = local.tags
+}
+
+resource "null_resource" "build_layer" {
+  provisioner "local-exec" {
+    command = "powershell.exe -ExecutionPolicy Bypass -File ${path.module}/build_layer.ps1"
+  }
+
+  # Run again if requirements.txt changes
+  triggers = {
+    requirements_hash = filemd5("${path.module}/requirements.txt")
+    build_script_hash = filemd5("${path.module}/build_layer.ps1")
+  }
+}
+
+# Step 2: Lambda Layer (depends on the script output)
+resource "aws_lambda_layer_version" "deps" {
+  filename           = "${path.module}/layer.zip"
+  layer_name         = "python-deps"
+  compatible_runtimes = ["python3.10"]
+
+  source_code_hash   =  base64encode(
+    sha256(
+      "filemd5(\"${path.module}/requirements.txt\") + filemd5(\"${path.module}/build_layer.ps1\")"
+    )
+  )
+
+  depends_on = [null_resource.build_layer]
 }
