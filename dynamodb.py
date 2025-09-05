@@ -1,10 +1,13 @@
 import boto3
+import logging
 from datetime import date
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('Advertisement')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 def add_to_db(url: str,
@@ -20,9 +23,7 @@ def add_to_db(url: str,
               location: str) -> None:
 
     try:
-        table = dynamodb.Table('Advertisement')
         date_added = date.today().isoformat()
-
         item = {
             'url': url,
             'webpage_name': webpage_name,
@@ -45,28 +46,27 @@ def add_to_db(url: str,
             'price_mileage': f"{price}#{mileage}"
         }
         table.put_item(Item=item)
-        print(f"Advertisement added: {item}")
+        logger.info(f"Added {item}")
     except ClientError as e:
-        print(f"Error adding to database: {e.response['Error']['Message']}")
+        logger.error(f"Error adding to database: {e.response['Error']['Message']}")
 
 def url_exists(url: str) -> bool:
     try:
-        table = dynamodb.Table('Advertisement')
         response = table.get_item(Key={'url': url})
         return 'Item' in response
     except ClientError as e:
-        print(f"Error checking advertisement existence: {e.response['Error']['Message']}")
+        logger.error(f"Error checking advertisement existence: {e.response['Error']['Message']}")
         return False
 
 def query_by_year_range(min_year: int, max_year: int):
     try:
         response = table.query(
             IndexName='yearRangeIndex',
-            KeyConditionExpression=Key('constant_key').eq('ads')& Key('year').between(min_year, max_year)
+            KeyConditionExpression=Key('constant_key').eq('ads') & Key('year').between(min_year, max_year)
         )
         return response.get('Items', [])
     except ClientError as e:
-        print(f"Error querying by year range: {e.response['Error']['Message']}")
+        logger.error(f"Error querying by year range: {e.response['Error']['Message']}")
         return []
 
 def query_by_webpage(webpage_name: str):
@@ -77,7 +77,7 @@ def query_by_webpage(webpage_name: str):
         )
         return response.get('Items', [])
     except ClientError as e:
-        print(f"Error querying by webpage: {e.response['Error']['Message']}")
+        logger.error(f"Error querying by webpage: {e.response['Error']['Message']}")
         return []
 
 def query_by_price_range(min_price: int, max_price: int):
@@ -88,18 +88,18 @@ def query_by_price_range(min_price: int, max_price: int):
         )
         return response.get('Items', [])
     except ClientError as e:
-        print(f"Error querying by price range: {e.response['Error']['Message']}")
+        logger.error(f"Error querying by price range: {e.response['Error']['Message']}")
         return []
 
-def query_by_year_partial_brand(year: int, brand_prefix: str):
+def query_by_year_partial_brand(year: int, price_brand_prefix: str):
     try:
         response = table.query(
             IndexName='yearBrandIndex',
-            KeyConditionExpression=Key('year').eq(year) & Key('brand').begins_with(brand_prefix)
+            KeyConditionExpression=Key('price_brand').begins_with(price_brand_prefix)
         )
         return response.get('Items', [])
     except ClientError as e:
-        print(f"Error querying by year and brand: {e.response['Error']['Message']}")
+        logger.error(f"Error querying by year and brand: {e.response['Error']['Message']}")
         return []
 
 def query_by_price_partial_brand(min_price: int, max_price: int, brand_prefix: str):
@@ -110,7 +110,7 @@ def query_by_price_partial_brand(min_price: int, max_price: int, brand_prefix: s
         )
         return response.get('Items', [])
     except ClientError as e:
-        print(f"Error querying by price range and brand: {e.response['Error']['Message']}")
+        logger.error(f"Error querying by price range and brand: {e.response['Error']['Message']}")
         return []
 
 def query_by_gearbox_prefix(prefix: str):
@@ -121,5 +121,5 @@ def query_by_gearbox_prefix(prefix: str):
         )
         return response.get('Items', [])
     except ClientError as e:
-        print(f"Error querying by gearbox prefix: {e.response['Error']['Message']}")
+        logger.error(f"Error querying by gearbox: {e.response['Error']['Message']}")
         return []
