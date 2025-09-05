@@ -91,11 +91,11 @@ def query_by_price_range(min_price: int, max_price: int):
         logger.error(f"Error querying by price range: {e.response['Error']['Message']}")
         return []
 
-def query_by_year_partial_brand(year: int, price_brand_prefix: str):
+def query_by_year_partial_brand(year: int,price_brand, price_brand_prefix: str):
     try:
         response = table.query(
             IndexName='yearBrandIndex',
-            KeyConditionExpression=Key('price_brand').begins_with(price_brand_prefix)
+            KeyConditionExpression=Key('year').eq('price_brand') & Key('price_brand').begins_with(price_brand_prefix)
         )
         return response.get('Items', [])
     except ClientError as e:
