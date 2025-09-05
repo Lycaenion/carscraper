@@ -6,7 +6,13 @@ __pycache__/
 #.idea/
 *.idea/
 
+venv
+
 *.sqlite
+
+*.zip
+*.terraform.lock.hcl
+.terraform/
 
 *.png
 

@@ -39,9 +39,9 @@ class Advertisement(Base):
     webpage: Mapped[Webpage] = relationship(back_populates='advertisements')
     brand: Mapped[str] = mapped_column(String(100), nullable=False)
     model_version: Mapped[str] = mapped_column(String(100), nullable=True)
-    year: Mapped[str] = mapped_column(String(20), nullable=True)
+    year: Mapped[int] = mapped_column(nullable=True)
     price: Mapped[int] = mapped_column(Integer, nullable=True)
-    mileage: Mapped[str] = mapped_column(String(100), nullable=True)
+    mileage: Mapped[int] = mapped_column(nullable=True)
     gearbox: Mapped[str] = mapped_column(String(100), nullable=True)
     fuel_type: Mapped[str] = mapped_column(String(100), nullable=True)
     engine_power: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -55,9 +55,9 @@ def add_to_db(url: str,
               webpage_name: str,
               brand: str,
               model_version: str,
-              year: str,
+              year: int,
               price: int,
-              mileage: str,
+              mileage: int,
               gearbox: str,
               fuel_type: str,
               engine_power: str,
