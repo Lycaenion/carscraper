@@ -62,7 +62,7 @@ def query_by_year_range(min_year: int, max_year: int):
     try:
         response = table.query(
             IndexName='yearRangeIndex',
-            KeyConditionExpression=Key('year').eq('ads')& Key('year').between(min_year, max_year)
+            KeyConditionExpression=Key('constant_key').eq('ads')& Key('year').between(min_year, max_year)
         )
         return response.get('Items', [])
     except ClientError as e:

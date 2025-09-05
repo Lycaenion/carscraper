@@ -39,7 +39,7 @@ class Advertisement(Base):
     webpage: Mapped[Webpage] = relationship(back_populates='advertisements')
     brand: Mapped[str] = mapped_column(String(100), nullable=False)
     model_version: Mapped[str] = mapped_column(String(100), nullable=True)
-    year: Mapped[str] = mapped_column(String(20), nullable=True)
+    year: Mapped[int] = mapped_column(nullable=True)
     price: Mapped[int] = mapped_column(Integer, nullable=True)
     mileage: Mapped[int] = mapped_column(nullable=True)
     gearbox: Mapped[str] = mapped_column(String(100), nullable=True)
