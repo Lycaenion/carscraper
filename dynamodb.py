@@ -91,7 +91,7 @@ def query_by_price_range(min_price: int, max_price: int):
         print(f"Error querying by price range: {e.response['Error']['Message']}")
         return []
 
-def query_by_year_partial_brand(year: str, brand_prefix: str):
+def query_by_year_partial_brand(year: int, brand_prefix: str):
     try:
         response = table.query(
             IndexName='yearBrandIndex',
