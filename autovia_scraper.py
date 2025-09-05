@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 import sys
 import pickle
@@ -11,6 +12,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
+import dynamodb
 import project_db
 
 AUTOVIA_URL = "https://www.autovia.sk/osobne-auta/?p%5Border%5D=1"
@@ -32,12 +34,12 @@ class CarData:
     brand: str
     model_ver: Optional[str]
     price: int
-    year: str
+    year: int
     location: Optional[str]
     fuel: Optional[str]
     engine_power: str
     gearbox: str
-    mileage: str
+    mileage: int
 
 class AutoviaScraper:
     def __init__(self, url: str, cookies_file: str):
@@ -109,7 +111,8 @@ class AutoviaScraper:
             price_text = price_text.strip('€').replace(',', '').replace(' ', '')
             price = int(price_text)
             year_text = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Rok:')]/parent::div").text
-            year = year_text.replace('Rok: ', '')
+            year_filtered = year_text.replace('Rok: ', '')
+            year = self.extract_year(year_filtered)
             location_text = self.driver.find_element(By.XPATH, "//div[@title='Lokalita']").text
             location = location_text.replace('Lokalita ', '')
             fuel_text = self.driver.find_element(By.XPATH, "//strong[contains(text(), 'Palivo:')]/parent::div").text
@@ -119,7 +122,8 @@ class AutoviaScraper:
             gearbox_text = self.driver.find_element(By.XPATH, "//strong[contains(text(),'Prevodovka:')]/parent::div").text
             gearbox = gearbox_text.replace('Prevodovka: ', '')
             mileage_text = self.driver.find_element(By.XPATH, "//strong[contains(text(), 'Počet km:')]/parent::div").text
-            mileage = mileage_text.replace('Počet km: ', '')
+            mileage_strip = mileage_text.replace('Počet km: ', '').replace(',', '').replace('km', '')
+            mileage = int(mileage_strip)
 
             return CarData(
                 url=url,
@@ -184,6 +188,13 @@ class AutoviaScraper:
                 break
         self.driver.quit()
 
+    def extract_year(self, str_year: str) -> int | None:
+        match  = re.search(r'\b(19\d{2}|20\d{2})\b', str_year)
+        if match:
+            return int(match.group(0))
+        return None
+
+
     def process_batch(self, batch):
         for link in batch:
             if project_db.url_exists(link):
@@ -211,6 +222,19 @@ class AutoviaScraper:
             if car_data:
                 logger.info(car_data)
                 project_db.add_to_db(
+                    url=car_data.url,
+                    webpage_name='autovia',
+                    brand=car_data.brand,
+                    model_version=car_data.model_ver,
+                    year=car_data.year,
+                    price=car_data.price,
+                    mileage=car_data.mileage,
+                    gearbox=car_data.gearbox,
+                    fuel_type=car_data.fuel,
+                    engine_power=car_data.engine_power,
+                    location=car_data.location
+                )
+                dynamodb.add_to_db(
                     url=car_data.url,
                     webpage_name='autovia',
                     brand=car_data.brand,

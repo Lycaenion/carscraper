@@ -30,6 +30,7 @@ locals {
   projectdb_code = templatefile("${path.module}/project_db.py", {})
   autovia_code = templatefile("${path.module}/autovia_scraper.py", {})
   autoscout24_code = templatefile("${path.module}/autoscout24_scraper.py", {})
+  dynamodb_code = templatefile("${path.module}/dynamodb.py", {})
   tags = {
     Project     = "CarScraper" # Tag to indicate the project name
   }
@@ -53,6 +54,11 @@ data "archive_file" "lambda_zip" {
     source {
         content  = local.autoscout24_code
         filename = "autoscout24_scraper.py"
+    }
+
+    source {
+        content  = local.dynamodb_code
+        filename = "dynamodb.py"
     }
 }
 
@@ -124,4 +130,107 @@ resource "aws_lambda_layer_version" "deps" {
   )
 
   depends_on = [null_resource.build_layer]
+}
+
+resource "aws_dynamodb_table" "advertisement" {
+  name = "Advertisement"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key = "url"
+
+  attribute {
+      name = "url"
+      type = "S"
+  }
+
+  attribute {
+    name = "webpage_name"
+    type = "S"
+  }
+
+  attribute{
+      name = "brand"
+      type = "S"
+  }
+
+  attribute{
+    name = "year"
+    type = "N"
+  }
+
+  attribute{
+    name = "price"
+    type = "N"
+  }
+
+  attribute{
+    name = "price_brand"
+    type = "S"
+  }
+
+  attribute{
+    name= "price_mileage"
+    type = "S"
+  }
+
+  attribute{
+    name = "gearbox"
+    type = "S"
+  }
+
+  attribute{
+      name = "constant_key"
+      type = "S"
+  }
+
+  #GSI 1 - year index
+  global_secondary_index {
+      name              = "yearIndex"
+      hash_key          = "year"
+      projection_type   = "ALL"
+  }
+  #GSI 2 - price index
+  global_secondary_index {
+      name              = "priceIndex"
+      hash_key          = "price"
+      projection_type   = "ALL"
+  }
+  #GSI 3 - year brand index
+  global_secondary_index {
+      name              = "yearBrandIndex"
+      hash_key          = "year"
+      range_key         = "brand"
+      projection_type   = "ALL"
+  }
+  #GSI 4 - price brand index
+  global_secondary_index {
+      name              = "priceBrandIndex"
+      hash_key          = "price_brand"
+      projection_type   = "ALL"
+  }
+  #GSI 5 - price mileage index
+  global_secondary_index {
+      name              = "priceMileageIndex"
+      hash_key          = "price_mileage"
+      projection_type   = "ALL"
+  }
+  #GSI 6 - gearbox index
+  global_secondary_index {
+      name              = "gearboxIndex"
+      hash_key          = "gearbox"
+      projection_type   = "ALL"
+  }
+  #GSI 7 - webpage name index
+  global_secondary_index {
+    name            = "webpageNameIndex"
+    hash_key        = "webpage_name"
+    projection_type = "ALL"
+  }
+  #GSI 8 - year range index (for filtering between years)
+  global_secondary_index {
+  name            = "yearRangeIndex"
+  hash_key        = "constant_key"
+  range_key       = "year"
+  projection_type = "ALL"
+}
+  tags = local.tags
 }

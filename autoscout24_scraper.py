@@ -1,7 +1,10 @@
 import pickle
+import re
 import time
 import sys
 import logging
+
+import dynamodb
 import project_db
 from dataclasses import dataclass
 from typing import Optional
@@ -28,12 +31,12 @@ class CarData:
     brand: str
     model_ver: Optional[str]
     price: int
-    year: str
+    year: int
     location: Optional[str]
     fuel: Optional[str]
     engine_power: str
     gearbox: str
-    mileage: str
+    mileage: int
 
 class Autoscout24Scraper:
     def __init__(self, url: str, cookies_file: str):
@@ -121,6 +124,7 @@ class Autoscout24Scraper:
 
             try:
                 year = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[3]").text
+                year = self.extract_year(year)
             except NoSuchElementException as e:
                 logger.exception(self.driver.page_source.encode('utf-8'))
                 self.driver.save_screenshot('screen.png')
@@ -159,6 +163,8 @@ class Autoscout24Scraper:
 
             try:
                 mileage = self.driver.find_element(By.XPATH, "(//div[contains(@class, 'StageArea_overviewContainer__UyZ9n')]//div[contains(@class,'VehicleOverview_itemText__AI4dA')])[1]").text
+                mileage_raw = mileage.replace(' km', '').replace(',', '').replace(' ', '')
+                mileage = int(mileage_raw)
             except NoSuchElementException as e:
                 logger.exception(self.driver.page_source.encode('utf-8'))
                 self.driver.save_screenshot('screen.png')
@@ -179,6 +185,12 @@ class Autoscout24Scraper:
         except Exception as e:
             logger.info(f"Error extracting car data: {e}")
             return None
+
+    def extract_year(self, str_year: str) -> int | None:
+        match  = re.search(r'\b(19\d{2}|20\d{2})\b', str_year)
+        if match:
+            return int(match.group(0))
+        return None
 
     def scrape(self, max_pages = 20):
         self.setup_driver()
@@ -257,6 +269,19 @@ class Autoscout24Scraper:
             if car_data:
                 logger.info(car_data)
                 project_db.add_to_db(
+                    url=car_data.url,
+                    webpage_name='autoscout24',
+                    brand=car_data.brand,
+                    model_version=car_data.model_ver,
+                    year=car_data.year,
+                    price=car_data.price,
+                    mileage=car_data.mileage,
+                    gearbox=car_data.gearbox,
+                    fuel_type=car_data.fuel,
+                    engine_power=car_data.engine_power,
+                    location=car_data.location
+                )
+                dynamodb.add_to_db(
                     url=car_data.url,
                     webpage_name='autoscout24',
                     brand=car_data.brand,

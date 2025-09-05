@@ -41,7 +41,7 @@ class Advertisement(Base):
     model_version: Mapped[str] = mapped_column(String(100), nullable=True)
     year: Mapped[str] = mapped_column(String(20), nullable=True)
     price: Mapped[int] = mapped_column(Integer, nullable=True)
-    mileage: Mapped[str] = mapped_column(String(100), nullable=True)
+    mileage: Mapped[int] = mapped_column(nullable=True)
     gearbox: Mapped[str] = mapped_column(String(100), nullable=True)
     fuel_type: Mapped[str] = mapped_column(String(100), nullable=True)
     engine_power: Mapped[str] = mapped_column(String(100), nullable=True)
